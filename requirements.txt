@@ -1,1 +1,2 @@
-pyautogui>=0.9.54
+# Minescript scripts run inside the game's embedded Python interpreter.
+# No external pip packages are required.
