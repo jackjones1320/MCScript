@@ -5,8 +5,8 @@ Minescript-based farming automation. Harvests crops by strafing rows
 while holding W (forward) and attack the entire time.
 
 Player orientation: facing along the X axis.
-  - A (strafe left)  → z increases (+Z)
-  - D (strafe right) → z decreases (-Z)
+  - A (strafe left)  → z decreases (-Z)
+  - D (strafe right) → z increases (+Z)
   - W (forward)      → held continuously; advances player to next row
                        when A/D is released at end of each pass
 
@@ -27,8 +27,8 @@ POLL = 0.05  # seconds between position checks during polling loops
 # ---------------------------------------------------------------------------
 
 WHEAT = dict(
-    z_start   = -238,
-    z_end     =  238,
+    z_start   = -238,   # lower z bound (A-key destination, odd passes)
+    z_end     =  239,   # upper z bound (D-key destination, even passes / starting position)
     passes    = 3,
     row_width = 5,           # blocks to advance in X between passes
     warp      = "/warp garden",
@@ -39,11 +39,15 @@ WHEAT = dict(
 # ---------------------------------------------------------------------------
 
 def wait_until_z(target_z: float, going_left: bool) -> None:
-    """Poll player Z until the pass endpoint is reached."""
+    """Poll player Z until the pass endpoint is reached.
+
+    going_left (A key) → z decreases; stop when z <= target.
+    not going_left (D key) → z increases; stop when z >= target.
+    """
     while True:
         z = player_position()[2]
-        if going_left     and z >= target_z: break
-        if not going_left and z <= target_z: break
+        if going_left     and z <= target_z: break
+        if not going_left and z >= target_z: break
         time.sleep(POLL)
 
 
@@ -62,16 +66,17 @@ def wait_for_row_advance(start_x: float, row_width: int) -> None:
 
 def farm_wheat(cfg: dict) -> None:
     echo("=== Farm: Wheat ===")
-    echo(f"z {cfg['z_start']} \u2194 z {cfg['z_end']}  |  {cfg['passes']} passes  |  row width {cfg['row_width']}")
+    echo(f"z {cfg['z_end']} \u2192 z {cfg['z_start']}  |  {cfg['passes']} passes  |  row width {cfg['row_width']}")
 
     player_press_forward(True)   # hold W for the entire run
     player_press_attack(True)    # hold attack for the entire run
 
     try:
         for pass_num in range(1, cfg["passes"] + 1):
-            going_left = (pass_num % 2 == 1)   # odd → left (z+), even → right (z-)
-            target_z   = cfg["z_end"] if going_left else cfg["z_start"]
-            echo(f"Pass {pass_num}/{cfg['passes']} ({'left z+' if going_left else 'right z-'})")
+            # Odd passes: A key (z decreases to z_start); even passes: D key (z increases to z_end)
+            going_left = (pass_num % 2 == 1)
+            target_z   = cfg["z_start"] if going_left else cfg["z_end"]
+            echo(f"Pass {pass_num}/{cfg['passes']} ({'A z-' if going_left else 'D z+'})")
 
             if going_left:
                 player_press_left(True)
