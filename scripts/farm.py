@@ -54,12 +54,20 @@ def wait_until_z(target_z: float, going_left: bool) -> None:
 def wait_for_row_advance(start_x: float, row_width: int) -> None:
     """Wait until W has walked the player row_width blocks in X.
 
-    Uses a 0.5-block tolerance so block-aligned walls (which stop the player
-    fractionally short of the exact target) still trigger the condition.
+    Samples initial movement to determine which direction W moves the player
+    (depends on facing direction), then checks directionally so the trigger
+    fires correctly when moving forward rather than backwards.
     """
+    # Sample briefly to detect which way X is changing under W
+    time.sleep(POLL * 3)
+    sample_x = player_position()[0]
+    going_positive = sample_x >= start_x  # W increases X when facing +X
+
     while True:
         x = player_position()[0]
-        if abs(x - start_x) >= row_width - 0.5:
+        if going_positive and x >= start_x + (row_width - 0.5):
+            break
+        if not going_positive and x <= start_x - (row_width - 0.5):
             break
         time.sleep(POLL)
 
