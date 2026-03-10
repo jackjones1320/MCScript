@@ -7,7 +7,7 @@ while holding W (forward) and attack the entire time.
 Player orientation: facing along the X axis.
   - A (strafe left)  → z decreases (-Z)
   - D (strafe right) → z increases (+Z)
-  - W (forward)      → held continuously; advances player to next row
+  - S (backward)     → held continuously; advances player to next row
                        when A/D is released at end of each pass
 
 Usage (in-game chat):
@@ -72,7 +72,7 @@ def farm_wheat(cfg: dict) -> None:
     echo("=== Farm: Wheat ===")
     echo(f"z {cfg['z_end']} \u2192 z {cfg['z_start']}  |  {cfg['passes']} passes  |  row width {cfg['row_width']}")
 
-    player_press_forward(True)   # hold W for the entire run
+    player_press_back(True)      # hold S for the entire run
     player_press_attack(True)    # hold attack for the entire run
 
     try:
@@ -94,7 +94,7 @@ def farm_wheat(cfg: dict) -> None:
             else:
                 player_press_right(False)
 
-            # W is still held — garden advances player to next row
+            # S is still held — garden advances player to next row
             if pass_num < cfg["passes"]:
                 start_x = player_position()[0]
                 wait_for_row_advance(start_x, cfg["row_width"])
@@ -102,7 +102,7 @@ def farm_wheat(cfg: dict) -> None:
     finally:
         # Always release keys, even if an error occurs
         player_press_attack(False)
-        player_press_forward(False)
+        player_press_back(False)
         player_press_left(False)
         player_press_right(False)
 
