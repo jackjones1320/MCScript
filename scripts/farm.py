@@ -54,15 +54,20 @@ def wait_until_z(target_z: float, going_left: bool) -> None:
 def wait_for_row_advance(start_x: float, row_width: int) -> None:
     """Wait until W has walked the player row_width blocks in X.
 
-    Samples initial movement to determine which direction W moves the player
-    (depends on facing direction), then checks directionally so the trigger
-    fires correctly when moving forward rather than backwards.
+    Polls until X actually changes to determine facing direction, then
+    checks directionally so the trigger fires correctly going forward.
     """
-    # Sample briefly to detect which way X is changing under W
-    time.sleep(POLL * 3)
-    sample_x = player_position()[0]
-    going_positive = sample_x >= start_x  # W increases X when facing +X
+    # Wait until X genuinely moves so we know which way +W goes
+    going_positive = None
+    while going_positive is None:
+        x = player_position()[0]
+        if x > start_x:
+            going_positive = True
+        elif x < start_x:
+            going_positive = False
+        time.sleep(POLL)
 
+    # Now wait for the full row_width travel
     while True:
         x = player_position()[0]
         if going_positive and x >= start_x + (row_width - 0.5):
