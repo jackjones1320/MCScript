@@ -43,13 +43,12 @@ echo("message")              # prints to in-game console
 
 ### Camera control
 
-Minescript has **no native yaw/pitch API**. Camera rotation is achieved by teleporting the player to their current position with an overridden facing angle:
-
 ```python
-execute(f"/tp @p ~ ~ ~ {yaw:.2f} {pitch:.2f}")
+player_set_orientation(yaw: float, pitch: float)  # set camera facing
+yaw, pitch = player_orientation()                  # read current facing
 ```
 
-`~ ~ ~` keeps the player in place. Only yaw and pitch change. Use `/tp @p` for single-player; use `/tp @s` if the executor context is the player themselves.
+`player_set_orientation` is purely client-side and works on multiplayer servers including Hypixel. Do **not** use `/tp @p ~ ~ ~ <yaw> <pitch>` — players do not have teleport permission on Hypixel and the command will silently fail.
 
 ### Minecraft yaw conventions
 
@@ -97,13 +96,29 @@ Keep modules small. Do not mix movement, farming, and utility logic in the same 
 
 ---
 
-## Movement Pattern
+## Movement Patterns
 
-### Strafe direction — always use A key
+There are two valid strafe patterns depending on whether the farm uses turns.
 
-The mushroom farm always presses **A** (strafe left). It does **not** alternate between A and D.
+### Pattern 1: Alternating A/D (no turns)
 
-After a 180° turn, pressing A again moves the player in the **opposite absolute direction** — back along the row. The turn is what reverses direction, not the key.
+Used by farms like wheat where the player faces a fixed direction for the entire run. The key switches each pass; the camera never rotates.
+
+```python
+# Pass 1: press A → z decreases
+player_press_left(True)
+wait_until_z(Z_START, going_negative=True)
+player_press_left(False)
+
+# Pass 2: press D → z increases (same absolute direction as before)
+player_press_right(True)
+wait_until_z(Z_END, going_negative=False)
+player_press_right(False)
+```
+
+### Pattern 2: Always A, with 180° turns (turning farms)
+
+Used by farms like mushrooms where the player performs a 180° turn between passes. **Always press A** — the turn is what reverses the absolute direction, not the key.
 
 ```python
 # Pass 1: facing yaw=110, A strafes toward -Z
@@ -120,7 +135,7 @@ wait_until_z(Z_END, going_negative=False)
 player_press_left(False)
 ```
 
-If A and D are alternated **without** turning, the player bounces back and forth without changing facing. Do not do this.
+If A and D are alternated **without** turning, the player moves in the same absolute direction twice. Do not do this in turning farms.
 
 ### Row endpoint detection
 
@@ -175,9 +190,9 @@ def smooth_turn(start_yaw, end_yaw, duration):
     for i in range(steps + 1):
         t   = i / steps
         yaw = start_yaw + delta * bezier_ease(t)
-        execute(f"/tp @p ~ ~ ~ {yaw:.2f} {FARM_PITCH:.2f}")
+        player_set_orientation(yaw, FARM_PITCH)
         time.sleep(delay)
-    execute(f"/tp @p ~ ~ ~ {end_yaw:.2f} {FARM_PITCH:.2f}")  # snap to exact target
+    player_set_orientation(end_yaw, FARM_PITCH)  # snap to exact target
 ```
 
 ### Randomisation ranges (mushroom_farm.py defaults)
@@ -200,13 +215,14 @@ Small randomness should be applied to avoid perfectly mechanical patterns. Keep 
 ```python
 # Pitch micro-adjustment during strafing (~every 0.3s)
 pitch = FARM_PITCH + random.uniform(-2.0, 2.0)
-execute(f"/tp @p ~ ~ ~ {current_yaw:.2f} {pitch:.2f}")
+player_set_orientation(current_yaw, pitch)
 
 # Per-step timing jitter during turns
 time.sleep(delay + random.uniform(-0.005, 0.005))
 
 # Pitch jitter during each turn step
 pitch = FARM_PITCH + random.uniform(-1.5, 1.5)
+player_set_orientation(yaw, pitch)
 ```
 
 Do not apply large random offsets to yaw during strafing — this will cause the player to face away from the crop row.
@@ -279,8 +295,10 @@ Before committing new logic:
 ## Common Pitfalls
 
 - **Using W instead of A/D** — forward movement causes the player to drift perpendicular to the row
-- **Alternating A/D without turning** — sends the player in the same absolute direction twice
-- **Instant yaw assignment** — a single `/tp @p ~ ~ ~ new_yaw` looks like a snap; always interpolate
+- **Alternating A/D without turning** — in turning farms this sends the player in the same absolute direction twice; always press A and let the turn reverse direction
+- **Alternating A/D when you should keep them fixed** — in fixed-facing farms (no turns), pressing only A would send the player in one direction forever; use A on odd passes and D on even passes
+- **Using `/tp` on Hypixel** — players have no teleport permission; use `player_set_orientation()` instead
+- **Instant yaw assignment** — a single `player_set_orientation(new_yaw, pitch)` call looks like a snap; always interpolate across multiple steps
 - **Ignoring yaw wrap-around** — normalise delta with `(delta + 180) % 360 - 180` to take the shortest path
 - **Time-based row length** — player speed varies (potion effects, lag); use Z polling instead
 - **Missing `global current_yaw`** — without the `global` declaration, assigning inside a function creates a local variable and the module state is not updated
