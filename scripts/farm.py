@@ -2,12 +2,12 @@
 Farm Automation
 ===============
 Minescript-based farming automation. Harvests crops by strafing rows
-with A/D, then pressing W briefly between passes to advance to the next row.
+while holding W (forward) the entire run.
 
 Player orientation: facing along the X axis.
   - A (strafe left)  → z decreases (-Z)
   - D (strafe right) → z increases (+Z)
-  - W (forward)      → pressed only between passes to advance row_width in X
+  - W (forward)      → held the entire run; advances X continuously
 
 Usage (in-game chat):
   \\farm wheat
@@ -29,7 +29,7 @@ WHEAT = dict(
     z_start   = -238,   # lower z bound (A-key destination, odd passes)
     z_end     =  239,   # upper z bound (D-key destination, even passes / starting position)
     passes    = 3,
-    row_width = 5,           # blocks to advance in X between passes
+    row_width = 44,          # blocks to advance in X between passes
     warp      = "/warp garden",
 )
 
@@ -53,8 +53,9 @@ def wait_until_z(target_z: float, going_left: bool) -> None:
 def wait_for_row_advance(start_x: float, row_width: int) -> None:
     """Wait until the player has moved row_width blocks in X.
 
-    W is pressed before calling this and released after it returns.
-    abs() handles either facing direction without needing to know which way X changes.
+    start_x must be captured at the start of the pass (before A/D is pressed)
+    so that diagonal drift from W+A/D counts toward the row_width target.
+    abs() handles either facing direction.
     """
     while True:
         x = player_position()[0]
@@ -71,7 +72,8 @@ def farm_wheat(cfg: dict) -> None:
     echo("=== Farm: Wheat ===")
     echo(f"z {cfg['z_end']} \u2192 z {cfg['z_start']}  |  {cfg['passes']} passes  |  row width {cfg['row_width']}")
 
-    player_press_attack(True)    # hold attack for the entire run
+    player_press_forward(True)   # hold W the entire run
+    player_press_attack(True)    # hold attack the entire run
 
     try:
         for pass_num in range(1, cfg["passes"] + 1):
@@ -79,6 +81,10 @@ def farm_wheat(cfg: dict) -> None:
             going_left = (pass_num % 2 == 1)
             target_z   = cfg["z_start"] if going_left else cfg["z_end"]
             echo(f"Pass {pass_num}/{cfg['passes']} ({'A z-' if going_left else 'D z+'})")
+
+            # Capture X before strafing so diagonal drift (W+A/D) counts toward row_width
+            if pass_num < cfg["passes"]:
+                start_x = player_position()[0]
 
             if going_left:
                 player_press_left(True)
@@ -92,12 +98,9 @@ def farm_wheat(cfg: dict) -> None:
             else:
                 player_press_right(False)
 
-            # Press W only for the row advance between passes
+            # W still held — wait for row_width total X movement since start of this pass
             if pass_num < cfg["passes"]:
-                start_x = player_position()[0]
-                player_press_forward(True)
                 wait_for_row_advance(start_x, cfg["row_width"])
-                player_press_forward(False)
 
     finally:
         # Always release keys, even if an error occurs
