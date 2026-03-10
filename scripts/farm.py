@@ -2,13 +2,12 @@
 Farm Automation
 ===============
 Minescript-based farming automation. Harvests crops by strafing rows
-while holding W (forward) and attack the entire time.
+with A/D, then pressing W briefly between passes to advance to the next row.
 
 Player orientation: facing along the X axis.
   - A (strafe left)  → z decreases (-Z)
   - D (strafe right) → z increases (+Z)
-  - W (forward)      → held continuously; advances player to next row
-                       when A/D is released at end of each pass
+  - W (forward)      → pressed only between passes to advance row_width in X
 
 Usage (in-game chat):
   \\farm wheat
@@ -52,27 +51,14 @@ def wait_until_z(target_z: float, going_left: bool) -> None:
 
 
 def wait_for_row_advance(start_x: float, row_width: int) -> None:
-    """Wait until W has walked the player row_width blocks in X.
+    """Wait until the player has moved row_width blocks in X.
 
-    Polls until X actually changes to determine facing direction, then
-    checks directionally so the trigger fires correctly going forward.
+    W is pressed before calling this and released after it returns.
+    abs() handles either facing direction without needing to know which way X changes.
     """
-    # Wait until X genuinely moves so we know which way +W goes
-    going_positive = None
-    while going_positive is None:
-        x = player_position()[0]
-        if x > start_x:
-            going_positive = True
-        elif x < start_x:
-            going_positive = False
-        time.sleep(POLL)
-
-    # Now wait for the full row_width travel
     while True:
         x = player_position()[0]
-        if going_positive and x >= start_x + (row_width - 0.5):
-            break
-        if not going_positive and x <= start_x - (row_width - 0.5):
+        if abs(x - start_x) >= row_width - 0.5:
             break
         time.sleep(POLL)
 
@@ -85,7 +71,6 @@ def farm_wheat(cfg: dict) -> None:
     echo("=== Farm: Wheat ===")
     echo(f"z {cfg['z_end']} \u2192 z {cfg['z_start']}  |  {cfg['passes']} passes  |  row width {cfg['row_width']}")
 
-    player_press_forward(True)   # hold W for the entire run
     player_press_attack(True)    # hold attack for the entire run
 
     try:
@@ -107,10 +92,12 @@ def farm_wheat(cfg: dict) -> None:
             else:
                 player_press_right(False)
 
-            # W is still held — garden advances player to next row
+            # Press W only for the row advance between passes
             if pass_num < cfg["passes"]:
                 start_x = player_position()[0]
+                player_press_forward(True)
                 wait_for_row_advance(start_x, cfg["row_width"])
+                player_press_forward(False)
 
     finally:
         # Always release keys, even if an error occurs
