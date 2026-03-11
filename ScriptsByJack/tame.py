@@ -5,23 +5,25 @@ import math
 import threading
 import random
 
-
+#Start values
 start_pov = player_orientation()
 start_yaw = pov[0]
 start_time = time.time()
 elapsed = 0
 
-    
+#Interacting with hobar3
 def hotbar3():
     player_inventory_slot_to_hotbar(3)
     player_press_use(True)
     player_press_use(False)
     
+#Interacting with hotbar4
 def hotbar4():
     player_inventory_slot_to_hotbar(4)
     player_press_use(True)
     player_press_use(False)
     
+#Human randomness
 def randomness(yaw):
     pov = player_orientation()
     pitch = pov[0]
@@ -30,8 +32,11 @@ def randomness(yaw):
     else:
         player_set_orientation(yaw,0)
 
+#Attacking and deploying items
 def hotbarmanagement():
     while (True):
+        
+        elapsed = time.time() - start_time
         #Hotbar 3 every 3 seconds
         if math.floor(elapsed) != 0 and math.floor(elapsed) % 3 == 0:
             hotbar3()
@@ -47,12 +52,14 @@ def hotbarmanagement():
             hotbar4()
             time.sleep(1)
             elapsed = 0
+            start_time = time.time()
         
         player_press_attack(True)
         player_press_attack(False)
         
         time.sleep(random_float_in_range(0.05, 0.1))
     
+#Movement back and forth
 def movement():
     while (True):
         move = random_float_in_range(1.0,2.0)
